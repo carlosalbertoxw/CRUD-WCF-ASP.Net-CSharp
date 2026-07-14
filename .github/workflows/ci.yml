@@ -7,12 +7,8 @@ on:
     branches: [ master ]
 
 jobs:
-  build-and-test:
-    # windows-2022: su daemon de Docker corre contenedores Linux, que es lo que
-    # Testcontainers necesita para levantar MySQL. El nuevo windows-latest
-    # (Windows Server 2025) usa contenedores Windows por defecto y no encuentra
-    # el manifiesto Linux de mysql:8.4 ("no matching manifest for windows/amd64").
-    runs-on: windows-2022
+  build:
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -23,27 +19,21 @@ jobs:
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
-      - name: Setup .NET (para vstest / dotnet)
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Restaurar paquetes
         run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Restore
 
       - name: Compilar
         run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
 
-      # El runner windows-2022 trae Docker con contenedores Linux, así que
-      # Testcontainers puede levantar el MySQL 8.4 de las pruebas. Se
-      # ejecuta el DLL ya compilado por MSBuild con 'dotnet vstest' (no 'dotnet
-      # test', que reconstruiría los proyectos legacy y no consume su
-      # PackageReference correctamente).
-      - name: Pruebas de integración
-        run: >
-          dotnet vstest
-          tests/Notes.IntegrationTests/bin/Release/net472/Notes.IntegrationTests.dll
-          --logger:"console;verbosity=normal"
+  # NOTA: las pruebas de integración (tests/Notes.IntegrationTests) NO se corren
+  # en CI. Usan Testcontainers, que necesita Docker en modo contenedores Linux;
+  # los runners Windows de GitHub corren Docker en modo Windows containers y no
+  # pueden bajar la imagen Linux mysql:8.4. Tampoco pueden correrse en un runner
+  # Linux porque el proyecto de test es net472 (solo Windows).
+  #
+  # Se ejecutan en local, donde sí hay Docker-Linux, con:
+  #   msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
+  #   dotnet vstest tests/Notes.IntegrationTests/bin/Release/net472/Notes.IntegrationTests.dll
 
   dependency-audit:
     runs-on: windows-latest
