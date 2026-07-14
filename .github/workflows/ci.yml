@@ -8,7 +8,11 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    # windows-2022: su daemon de Docker corre contenedores Linux, que es lo que
+    # Testcontainers necesita para levantar MySQL. El nuevo windows-latest
+    # (Windows Server 2025) usa contenedores Windows por defecto y no encuentra
+    # el manifiesto Linux de mysql:8.4 ("no matching manifest for windows/amd64").
+    runs-on: windows-2022
 
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +34,8 @@ jobs:
       - name: Compilar
         run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
 
-      # Los runners windows-latest de GitHub traen Docker con contenedores Linux,
-      # así que Testcontainers puede levantar el MySQL 8.4 de las pruebas. Se
+      # El runner windows-2022 trae Docker con contenedores Linux, así que
+      # Testcontainers puede levantar el MySQL 8.4 de las pruebas. Se
       # ejecuta el DLL ya compilado por MSBuild con 'dotnet vstest' (no 'dotnet
       # test', que reconstruiría los proyectos legacy y no consume su
       # PackageReference correctamente).
