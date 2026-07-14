@@ -4,18 +4,16 @@ using System.Runtime.Serialization;
 namespace Model
 {
     /// <summary>
-    /// Nota con su contenido completo. Las fechas se manejan en UTC (la base de
-    /// datos corre en UTC); la conversión a hora local es del consumidor.
+    /// Vista resumida para los listados: no arrastra el contenido completo de la
+    /// nota (el texto se obtiene por id con <c>Get</c>).
     /// </summary>
     [DataContract]
-    public class Note
+    public class NoteSummary
     {
         [DataMember]
         public Int32 Id { get; set; }
         [DataMember]
         public String Title { get; set; }
-        [DataMember]
-        public String Text { get; set; }
         [DataMember]
         public DateTime CreatedAt { get; set; }
         [DataMember]

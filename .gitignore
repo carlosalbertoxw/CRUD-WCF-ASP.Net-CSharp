@@ -1,6 +1,11 @@
 #Archivos
 *.orig
 
+#Secretos locales (no commitear)
+.env
+**/connections.config
+**/App_Data/*.log
+
 #Carpetas
 [Bb]in/
 [Oo]bj/

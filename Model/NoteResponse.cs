@@ -1,25 +1,12 @@
-﻿using System;
 using System.Runtime.Serialization;
 
 namespace Model
 {
+    /// <summary>Respuesta que transporta una nota individual con su contenido.</summary>
     [DataContract]
-    public class NoteResponse
+    public class NoteResponse : Response
     {
-        private Note note;
-        private String message;
-
         [DataMember]
-        public Note Note
-        {
-            get { return note; }
-            set { note = value; }
-        }
-        [DataMember]
-        public String Message
-        {
-            get { return message; }
-            set { message = value; }
-        }
+        public Note Note { get; set; }
     }
 }

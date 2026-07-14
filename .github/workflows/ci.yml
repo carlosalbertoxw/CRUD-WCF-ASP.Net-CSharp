@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Setup .NET (para vstest / dotnet)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar paquetes
+        run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Restore
+
+      - name: Compilar
+        run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
+
+      # Los runners windows-latest de GitHub traen Docker con contenedores Linux,
+      # así que Testcontainers puede levantar el MySQL 8.4 de las pruebas. Se
+      # ejecuta el DLL ya compilado por MSBuild con 'dotnet vstest' (no 'dotnet
+      # test', que reconstruiría los proyectos legacy y no consume su
+      # PackageReference correctamente).
+      - name: Pruebas de integración
+        run: >
+          dotnet vstest
+          tests/Notes.IntegrationTests/bin/Release/net472/Notes.IntegrationTests.dll
+          --logger:"console;verbosity=normal"
+
+  dependency-audit:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Audita los paquetes NuGet del proyecto de datos (el que trae dependencias
+      # de terceros) contra las advertencias de seguridad conocidas.
+      - name: Restaurar
+        run: dotnet restore Data/Data.csproj
+
+      - name: Auditar dependencias vulnerables
+        shell: pwsh
+        run: |
+          $out = dotnet list Data/Data.csproj package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Host $out
+          if ($out -match 'has the following vulnerable packages') {
+            Write-Error 'Se encontraron paquetes con vulnerabilidades conocidas.'
+            exit 1
+          }
