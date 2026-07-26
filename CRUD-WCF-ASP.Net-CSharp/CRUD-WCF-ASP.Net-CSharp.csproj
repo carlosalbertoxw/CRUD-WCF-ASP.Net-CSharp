@@ -73,7 +73,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MySqlConnector" Version="2.3.7" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />

@@ -18,8 +18,7 @@ namespace Notes.IntegrationTests
 
         public MySqlFixture()
         {
-            container = new MySqlBuilder()
-                .WithImage("mysql:8.4")
+            container = new MySqlBuilder("mysql:8.4")
                 .WithDatabase("notes")
                 .WithUsername("notes")
                 .WithPassword("notes")
