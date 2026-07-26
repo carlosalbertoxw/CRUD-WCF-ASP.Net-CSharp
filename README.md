@@ -5,7 +5,8 @@ por MySQL. Un CRUD de notas con **autenticación por API key** (hasheada, con
 revocación y expiración), **notas privadas por cliente**, **paginación por keyset**,
 **búsqueda de texto completo**, **rate limiting** por IP, **validación de entrada**,
 marcas de tiempo en UTC, **health checks** (liveness/readiness), **logging**
-configurable y **pruebas de integración** contra un MySQL real.
+configurable, **pruebas unitarias** de la lógica pura y **pruebas de integración**
+contra un MySQL real.
 
 ## Arquitectura
 
@@ -26,13 +27,15 @@ Solución por capas:
 │                 #   Web.config.
 ├── db/           # Esquema (db/init/) y utilidades SQL (seed, administración).
 ├── docker-compose.yml         # MySQL 8.4 (UTC) para desarrollo local.
-└── tests/        # Pruebas de integración (xUnit + Testcontainers).
+└── tests/        # Notes.UnitTests (xUnit, sin dependencias externas) y
+                  #   Notes.IntegrationTests (xUnit + Testcontainers).
 ```
 
 ## Requisitos
 
 - Visual Studio 2022 (o MSBuild) con el *targeting pack* de **.NET Framework 4.7.2**.
-- **Docker** (para la base de datos de desarrollo y las pruebas de integración).
+- **Docker** (para la base de datos de desarrollo y las pruebas de integración; las
+  pruebas unitarias no lo necesitan).
 - El conector **MySqlConnector** se restaura por NuGet (`msbuild -t:restore`).
 
 ## Puesta en marcha
@@ -138,19 +141,47 @@ Como SOAP no tiene códigos de estado como HTTP, cada respuesta incluye un
 
 ## Pruebas
 
+Hay dos suites con propósitos distintos: las **unitarias** cubren la lógica pura y
+corren en cualquier parte; las de **integración** validan la capa de datos contra un
+MySQL real y necesitan Docker.
+
+### Unitarias (`tests/Notes.UnitTests`)
+
 ```bash
-# Compilar y ejecutar las pruebas de integración (requiere Docker):
-msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Restore
-msbuild tests/Notes.IntegrationTests/Notes.IntegrationTests.csproj -p:Configuration=Debug
-dotnet vstest tests/Notes.IntegrationTests/bin/Debug/net472/Notes.IntegrationTests.dll
+msbuild tests/Notes.UnitTests/Notes.UnitTests.csproj -t:Restore
+msbuild tests/Notes.UnitTests/Notes.UnitTests.csproj -t:Build -p:Configuration=Release
+dotnet test tests/Notes.UnitTests/Notes.UnitTests.csproj --no-build -c Release
 ```
 
-Las pruebas levantan un **MySQL 8.4 efímero** con [Testcontainers](https://dotnet.testcontainers.org/),
+Sin Docker ni base de datos: solo referencian `Utilities` y `Model`. Cubren la
+seguridad de API keys (formato `<key_id>.<secreto>`, hash SHA-256 y comparación en
+tiempo constante), los límites de validación de una nota, el rate limiter por
+partición, la derivación de `Success` desde `ResponseStatus` y el formato del
+logging.
+
+### Integración (`tests/Notes.IntegrationTests`)
+
+```bash
+msbuild tests/Notes.IntegrationTests/Notes.IntegrationTests.csproj -t:Restore
+msbuild tests/Notes.IntegrationTests/Notes.IntegrationTests.csproj -t:Build -p:Configuration=Release
+dotnet test tests/Notes.IntegrationTests/Notes.IntegrationTests.csproj --no-build -c Release
+```
+
+Levantan un **MySQL 8.4 efímero** con [Testcontainers](https://dotnet.testcontainers.org/),
 le aplican el esquema real y ejercitan la capa de datos y la seguridad de API keys:
 autenticación (hash/revocación/expiración), ciclo CRUD, aislamiento por cliente,
-paginación keyset, búsqueda full-text y marcas de tiempo en UTC. En cada push,
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) restaura,
-compila, corre las pruebas y audita dependencias vulnerables.
+paginación keyset, búsqueda full-text y marcas de tiempo en UTC. **Requieren Docker
+en modo contenedores Linux.**
+
+### En CI
+
+En cada push, GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml))
+restaura y compila la solución, ejecuta las **pruebas unitarias** (job `unit-tests`,
+encadenado a la compilación) y audita dependencias vulnerables.
+
+Las de **integración no corren en CI**: los runners Windows de GitHub usan Docker en
+modo contenedores Windows y no pueden bajar la imagen Linux `mysql:8.4`, y tampoco
+sirve un runner Linux porque el proyecto es net472. Se ejecutan en local.
 
 ## Limitaciones y decisiones (WCF/SOAP)
 
