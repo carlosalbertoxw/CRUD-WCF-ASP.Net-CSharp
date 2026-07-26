@@ -25,13 +25,40 @@ jobs:
       - name: Compilar
         run: msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
 
+  unit-tests:
+    runs-on: windows-latest
+    # Encadenado a la compilación para no correr en paralelo con ella: si la
+    # solución no compila, no tiene sentido gastar un runner en las pruebas.
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v4
+
+      # Se compila solo el proyecto de pruebas unitarias: arrastra Utilities y
+      # Model, que es todo lo que necesita. No toca el proyecto web ni Data.
+      - name: Restaurar paquetes
+        run: msbuild tests/Notes.UnitTests/Notes.UnitTests.csproj -t:Restore
+
+      - name: Compilar las pruebas unitarias
+        run: msbuild tests/Notes.UnitTests/Notes.UnitTests.csproj -t:Build -p:Configuration=Release
+
+      - name: Ejecutar las pruebas unitarias
+        run: dotnet test tests/Notes.UnitTests/Notes.UnitTests.csproj --no-build -c Release
+
   # NOTA: las pruebas de integración (tests/Notes.IntegrationTests) NO se corren
   # en CI. Usan Testcontainers, que necesita Docker en modo contenedores Linux;
   # los runners Windows de GitHub corren Docker en modo Windows containers y no
   # pueden bajar la imagen Linux mysql:8.4. Tampoco pueden correrse en un runner
   # Linux porque el proyecto de test es net472 (solo Windows).
   #
-  # Se ejecutan en local, donde sí hay Docker-Linux, con:
+  # Por eso el job unit-tests de arriba cubre solo lógica pura (sin Docker ni base
+  # de datos). Las de integración se ejecutan en local, donde sí hay Docker-Linux:
   #   msbuild CRUD-WCF-ASP.Net-CSharp.sln -t:Build -p:Configuration=Release
   #   dotnet vstest tests/Notes.IntegrationTests/bin/Release/net472/Notes.IntegrationTests.dll
 
